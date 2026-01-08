@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.6
-FROM --platform=$BUILDPLATFORM golang:1.24-bookworm AS builder
+FROM --platform=$TARGETPLATFORM golang:1.24-bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
@@ -20,7 +20,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH make build
+RUN make build
 
 FROM debian:bookworm-slim
 
