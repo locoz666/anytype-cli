@@ -10,6 +10,8 @@ import (
 )
 
 var listenAddress string
+var grpcListenAddress string
+var grpcWebListenAddress string
 
 func NewServeCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -21,6 +23,8 @@ func NewServeCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&listenAddress, "listen-address", config.DefaultAPIAddress, "API listen address in `host:port` format")
+	cmd.Flags().StringVar(&grpcListenAddress, "grpc-listen-address", config.DefaultGRPCAddress, "gRPC listen address in `host:port` format")
+	cmd.Flags().StringVar(&grpcWebListenAddress, "grpc-web-listen-address", config.DefaultGRPCWebAddress, "gRPC-Web listen address in `host:port` format")
 
 	return cmd
 }
@@ -32,7 +36,7 @@ func runServer(cmd *cobra.Command, args []string) error {
 		Description: "Anytype",
 	}
 
-	prg := serviceprogram.New(listenAddress)
+	prg := serviceprogram.New(listenAddress, grpcListenAddress, grpcWebListenAddress)
 
 	s, err := service.New(prg, svcConfig)
 	if err != nil {

@@ -8,38 +8,62 @@ import (
 
 func TestNew(t *testing.T) {
 	tests := []struct {
-		name          string
-		apiListenAddr string
-		wantAddr      string
+		name              string
+		apiListenAddr     string
+		grpcListenAddr    string
+		grpcWebListenAddr string
+		wantAPIAddr       string
+		wantGRPCAddr      string
+		wantGRPCWebAddr   string
 	}{
 		{
-			name:          "with default address",
-			apiListenAddr: config.DefaultAPIAddress,
-			wantAddr:      config.DefaultAPIAddress,
+			name:              "with default address",
+			apiListenAddr:     config.DefaultAPIAddress,
+			grpcListenAddr:    config.DefaultGRPCAddress,
+			grpcWebListenAddr: config.DefaultGRPCWebAddress,
+			wantAPIAddr:       config.DefaultAPIAddress,
+			wantGRPCAddr:      config.DefaultGRPCAddress,
+			wantGRPCWebAddr:   config.DefaultGRPCWebAddress,
 		},
 		{
-			name:          "with custom address",
-			apiListenAddr: "0.0.0.0:8080",
-			wantAddr:      "0.0.0.0:8080",
+			name:              "with custom address",
+			apiListenAddr:     "0.0.0.0:8080",
+			grpcListenAddr:    "0.0.0.0:31010",
+			grpcWebListenAddr: "0.0.0.0:31011",
+			wantAPIAddr:       "0.0.0.0:8080",
+			wantGRPCAddr:      "0.0.0.0:31010",
+			wantGRPCWebAddr:   "0.0.0.0:31011",
 		},
 		{
-			name:          "with empty address",
-			apiListenAddr: "",
-			wantAddr:      "",
+			name:              "with empty address",
+			apiListenAddr:     "",
+			grpcListenAddr:    "",
+			grpcWebListenAddr: "",
+			wantAPIAddr:       "",
+			wantGRPCAddr:      "",
+			wantGRPCWebAddr:   "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			prg := New(tt.apiListenAddr)
+			prg := New(tt.apiListenAddr, tt.grpcListenAddr, tt.grpcWebListenAddr)
 
 			if prg == nil {
 				t.Fatal("New() returned nil")
 				return
 			}
 
-			if prg.apiListenAddr != tt.wantAddr {
-				t.Errorf("apiListenAddr = %v, want %v", prg.apiListenAddr, tt.wantAddr)
+			if prg.apiListenAddr != tt.wantAPIAddr {
+				t.Errorf("apiListenAddr = %v, want %v", prg.apiListenAddr, tt.wantAPIAddr)
+			}
+
+			if prg.grpcListenAddr != tt.wantGRPCAddr {
+				t.Errorf("grpcListenAddr = %v, want %v", prg.grpcListenAddr, tt.wantGRPCAddr)
+			}
+
+			if prg.grpcWebListenAddr != tt.wantGRPCWebAddr {
+				t.Errorf("grpcWebListenAddr = %v, want %v", prg.grpcWebListenAddr, tt.wantGRPCWebAddr)
 			}
 
 			if prg.startCh == nil {

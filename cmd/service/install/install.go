@@ -10,12 +10,14 @@ import (
 
 func NewInstallCmd() *cobra.Command {
 	var listenAddress string
+	var grpcListenAddress string
+	var grpcWebListenAddress string
 
 	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install as a user service",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			s, err := serviceprogram.GetServiceWithAddress(listenAddress)
+			s, err := serviceprogram.GetServiceWithAddresses(listenAddress, grpcListenAddress, grpcWebListenAddress)
 			if err != nil {
 				return output.Error("Failed to create service: %w", err)
 			}
@@ -29,6 +31,12 @@ func NewInstallCmd() *cobra.Command {
 			if listenAddress != config.DefaultAPIAddress {
 				output.Info("API will listen on %s", listenAddress)
 			}
+			if grpcListenAddress != config.DefaultGRPCAddress {
+				output.Info("gRPC will listen on %s", grpcListenAddress)
+			}
+			if grpcWebListenAddress != config.DefaultGRPCWebAddress {
+				output.Info("gRPC-Web will listen on %s", grpcWebListenAddress)
+			}
 			output.Print("\nTo manage the service:")
 			output.Print("  Start:   anytype service start")
 			output.Print("  Stop:    anytype service stop")
@@ -40,6 +48,8 @@ func NewInstallCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&listenAddress, "listen-address", config.DefaultAPIAddress, "API listen address in `host:port` format")
+	cmd.Flags().StringVar(&grpcListenAddress, "grpc-listen-address", config.DefaultGRPCAddress, "gRPC listen address in `host:port` format")
+	cmd.Flags().StringVar(&grpcWebListenAddress, "grpc-web-listen-address", config.DefaultGRPCWebAddress, "gRPC-Web listen address in `host:port` format")
 
 	return cmd
 }

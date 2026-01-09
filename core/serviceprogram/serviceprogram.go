@@ -17,11 +17,16 @@ import (
 
 // GetService creates a service instance with default configuration.
 func GetService() (service.Service, error) {
-	return GetServiceWithAddress("")
+	return GetServiceWithAddresses("", "", "")
 }
 
 // GetServiceWithAddress creates a service instance with a custom API listen address.
 func GetServiceWithAddress(apiAddr string) (service.Service, error) {
+	return GetServiceWithAddresses(apiAddr, "", "")
+}
+
+// GetServiceWithAddresses creates a service instance with custom API and gRPC listen addresses.
+func GetServiceWithAddresses(apiAddr, grpcAddr, grpcWebAddr string) (service.Service, error) {
 	options := service.KeyValue{
 		"UserService": true,
 	}
@@ -33,14 +38,30 @@ func GetServiceWithAddress(apiAddr string) (service.Service, error) {
 		}
 	}
 
-	effectiveAddr := apiAddr
-	if effectiveAddr == "" {
-		effectiveAddr = config.DefaultAPIAddress
+	effectiveAPIAddr := apiAddr
+	if effectiveAPIAddr == "" {
+		effectiveAPIAddr = config.DefaultAPIAddress
+	}
+
+	effectiveGRPCAddr := grpcAddr
+	if effectiveGRPCAddr == "" {
+		effectiveGRPCAddr = config.DefaultGRPCAddress
+	}
+
+	effectiveGRPCWebAddr := grpcWebAddr
+	if effectiveGRPCWebAddr == "" {
+		effectiveGRPCWebAddr = config.DefaultGRPCWebAddress
 	}
 
 	args := []string{"serve"}
-	if effectiveAddr != config.DefaultAPIAddress {
-		args = append(args, "--listen-address", effectiveAddr)
+	if effectiveAPIAddr != config.DefaultAPIAddress {
+		args = append(args, "--listen-address", effectiveAPIAddr)
+	}
+	if effectiveGRPCAddr != config.DefaultGRPCAddress {
+		args = append(args, "--grpc-listen-address", effectiveGRPCAddr)
+	}
+	if effectiveGRPCWebAddr != config.DefaultGRPCWebAddress {
+		args = append(args, "--grpc-web-listen-address", effectiveGRPCWebAddr)
 	}
 
 	svcConfig := &service.Config{
@@ -51,7 +72,7 @@ func GetServiceWithAddress(apiAddr string) (service.Service, error) {
 		Option:      options,
 	}
 
-	prg := New(effectiveAddr)
+	prg := New(effectiveAPIAddr, effectiveGRPCAddr, effectiveGRPCWebAddr)
 	return service.New(prg, svcConfig)
 }
 
@@ -63,12 +84,16 @@ type Program struct {
 	startErr      error
 	startCh       chan struct{}
 	apiListenAddr string
+	grpcListenAddr string
+	grpcWebListenAddr string
 }
 
-func New(apiListenAddr string) *Program {
+func New(apiListenAddr, grpcListenAddr, grpcWebListenAddr string) *Program {
 	return &Program{
-		startCh:       make(chan struct{}),
-		apiListenAddr: apiListenAddr,
+		startCh:           make(chan struct{}),
+		apiListenAddr:     apiListenAddr,
+		grpcListenAddr:    grpcListenAddr,
+		grpcWebListenAddr: grpcWebListenAddr,
 	}
 }
 
@@ -115,7 +140,17 @@ func (p *Program) run() {
 	defer p.wg.Done()
 	defer close(p.startCh)
 
-	if err := p.server.Start(config.DefaultGRPCAddress, config.DefaultGRPCWebAddress); err != nil {
+	grpcAddr := p.grpcListenAddr
+	if grpcAddr == "" {
+		grpcAddr = config.DefaultGRPCAddress
+	}
+
+	grpcWebAddr := p.grpcWebListenAddr
+	if grpcWebAddr == "" {
+		grpcWebAddr = config.DefaultGRPCWebAddress
+	}
+
+	if err := p.server.Start(grpcAddr, grpcWebAddr); err != nil {
 		p.startErr = err
 		return
 	}
