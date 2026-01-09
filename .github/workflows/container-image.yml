@@ -13,24 +13,19 @@ permissions:
   packages: write
 
 jobs:
-  build:
+  meta:
     runs-on: ubuntu-latest
+
+    outputs:
+      image: ${{ steps.image.outputs.result }}
+      version: ${{ steps.buildvars.outputs.version }}
+      commit: ${{ steps.buildvars.outputs.commit }}
+      time: ${{ steps.buildvars.outputs.time }}
+      git_state: ${{ steps.buildvars.outputs.git_state }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve image name
         id: image
@@ -63,18 +58,113 @@ jobs:
           echo "time=${build_time}" >> "$GITHUB_OUTPUT"
           echo "git_state=${git_state}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
+  build-amd64:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (amd64)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           build-args: |
-            VERSION=${{ steps.buildvars.outputs.version }}
-            COMMIT=${{ steps.buildvars.outputs.commit }}
-            BUILD_TIME=${{ steps.buildvars.outputs.time }}
-            GIT_STATE=${{ steps.buildvars.outputs.git_state }}
+            VERSION=${{ needs.meta.outputs.version }}
+            COMMIT=${{ needs.meta.outputs.commit }}
+            BUILD_TIME=${{ needs.meta.outputs.time }}
+            GIT_STATE=${{ needs.meta.outputs.git_state }}
           tags: |
-            ${{ steps.image.outputs.result }}:latest
-            ${{ steps.image.outputs.result }}:${{ github.sha }}
-            ${{ steps.image.outputs.result }}:${{ steps.buildvars.outputs.version }}
+            ${{ needs.meta.outputs.image }}:latest
+            ${{ needs.meta.outputs.image }}:${{ github.sha }}
+            ${{ needs.meta.outputs.image }}:${{ needs.meta.outputs.version }}
+            ${{ needs.meta.outputs.image }}:latest-amd64
+            ${{ needs.meta.outputs.image }}:${{ github.sha }}-amd64
+            ${{ needs.meta.outputs.image }}:${{ needs.meta.outputs.version }}-amd64
+
+  build-arm64:
+    needs: meta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64
+          build-args: |
+            VERSION=${{ needs.meta.outputs.version }}
+            COMMIT=${{ needs.meta.outputs.commit }}
+            BUILD_TIME=${{ needs.meta.outputs.time }}
+            GIT_STATE=${{ needs.meta.outputs.git_state }}
+          tags: |
+            ${{ needs.meta.outputs.image }}:latest-arm64
+            ${{ needs.meta.outputs.image }}:${{ github.sha }}-arm64
+            ${{ needs.meta.outputs.image }}:${{ needs.meta.outputs.version }}-arm64
+
+  manifest:
+    needs:
+      - meta
+      - build-amd64
+      - build-arm64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifests
+        shell: bash
+        run: |
+          image="${{ needs.meta.outputs.image }}"
+          sha="${{ github.sha }}"
+          version="${{ needs.meta.outputs.version }}"
+
+          docker buildx imagetools create \
+            -t "${image}:latest" \
+            "${image}:latest-amd64" \
+            "${image}:latest-arm64"
+
+          docker buildx imagetools create \
+            -t "${image}:${sha}" \
+            "${image}:${sha}-amd64" \
+            "${image}:${sha}-arm64"
+
+          docker buildx imagetools create \
+            -t "${image}:${version}" \
+            "${image}:${version}-amd64" \
+            "${image}:${version}-arm64"
