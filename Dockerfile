@@ -3,6 +3,10 @@ FROM --platform=$TARGETPLATFORM golang:1.24-bookworm AS builder
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG VERSION=0.0.0-dev
+ARG COMMIT=unknown
+ARG BUILD_TIME=unknown
+ARG GIT_STATE=clean
 
 WORKDIR /src
 
@@ -20,7 +24,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN make build
+RUN VERSION=$VERSION \
+    COMMIT=$COMMIT \
+    BUILD_TIME="$BUILD_TIME" \
+    GIT_STATE=$GIT_STATE \
+    make build
 
 FROM debian:bookworm-slim
 

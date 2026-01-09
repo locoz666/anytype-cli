@@ -39,12 +39,42 @@ jobs:
           result-encoding: string
           script: return 'ghcr.io/${{ github.repository }}'.toLowerCase()
 
+      - name: Set build variables
+        id: buildvars
+        shell: bash
+        run: |
+          version=""
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version=$(git describe --tags 2>/dev/null || true)
+          fi
+          if [[ -z "${version}" ]]; then
+            version="0.0.0-dev"
+          fi
+          commit=$(git rev-parse --short HEAD)
+          build_time=$(date -u '+%Y-%m-%d %H:%M:%S')
+          git_state=clean
+          if ! git diff --quiet; then
+            git_state=dirty
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
+          echo "time=${build_time}" >> "$GITHUB_OUTPUT"
+          echo "git_state=${git_state}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ steps.buildvars.outputs.version }}
+            COMMIT=${{ steps.buildvars.outputs.commit }}
+            BUILD_TIME=${{ steps.buildvars.outputs.time }}
+            GIT_STATE=${{ steps.buildvars.outputs.git_state }}
           tags: |
             ${{ steps.image.outputs.result }}:latest
             ${{ steps.image.outputs.result }}:${{ github.sha }}
+            ${{ steps.image.outputs.result }}:${{ steps.buildvars.outputs.version }}
